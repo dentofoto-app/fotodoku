@@ -59,12 +59,17 @@
   .doc-title input { flex: 1; min-width: 220px; font-size: 18px; font-weight: 600; }
   .patient { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
   #fNotes { height: 54px; margin-bottom: 10px; }
-  .foot-pick { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px 8px; margin-bottom: 14px; }
-  .foot-pick summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 2px 0; }
-  .foot-pick summary b { color: #1d2a33; font-weight: 500; }
-  .foot-pick label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; padding: 5px 0; line-height: 1.3; }
-  .foot-pick input[type=checkbox] { width: 20px; height: 20px; flex: none; margin: 0; accent-color: var(--accent); }
-  .foot-pick input[type=text] { width: 100%; margin-top: 2px; }
+  .foot-pick { margin-bottom: 14px; }
+  .fp-item { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; font-size: 14px; line-height: 1.3;
+             padding: 9px 10px; margin: 0 0 6px; border: 1px solid var(--line); border-radius: 10px; background: #fff;
+             color: #1d2a33; -webkit-tap-highlight-color: transparent; }
+  .fp-item::before { content: ""; flex: none; width: 20px; height: 20px; border-radius: 6px; border: 2px solid #b8c3ca;
+                     box-sizing: border-box; margin-top: -1px; }
+  .fp-item.on { border-color: var(--accent); background: #f2f8fa; }
+  .fp-item.on::before { content: "✓"; background: var(--accent); border-color: var(--accent); color: #fff;
+                        font-size: 14px; font-weight: 700; line-height: 16px; text-align: center; }
+  .fp-item.own { color: var(--muted); }
+  .foot-pick input[type=text] { width: 100%; margin: 0 0 6px; }
 
   /* ---------- Bildraster ---------- */
   #grid { display: grid; gap: 16px; }
@@ -195,12 +200,12 @@
   </div>
   <label class="fl">Bemerkungen (optional – erscheint nur im PDF, wenn ausgefüllt)</label>
   <textarea id="fNotes"></textarea>
-  <details class="foot-pick" id="footPick">
-    <summary>Fußzeile im PDF: <b id="footSum"></b></summary>
+  <div class="foot-pick" id="footPick">
+    <label class="fl">Fußzeile im PDF – antippen zum An- und Abwählen (mehrere möglich)</label>
     <div id="footList"></div>
-    <label><input type="checkbox" id="footOwnOn" onchange="footChanged(true)"> Eigener Text</label>
-    <input type="text" id="footOwn" placeholder="Eigenen Fußzeilen-Text eingeben" oninput="$('footOwnOn').checked = !!this.value.trim(); footChanged()" hidden>
-  </details>
+    <button type="button" class="fp-item own" id="footOwnOn" onclick="this.classList.toggle('on'); footChanged(true)">Eigener Text …</button>
+    <input type="text" id="footOwn" placeholder="Eigenen Fußzeilen-Text eingeben" oninput="footChanged()" hidden>
+  </div>
   <div id="grid"></div>
 </div>
 
@@ -305,23 +310,23 @@ function fillFoots(reset = false) {
   const keep = !reset && box.children.length;
   box.innerHTML = "";
   list.forEach((t, i) => {
-    const l = document.createElement("label"), c = document.createElement("input");
-    c.type = "checkbox"; c.value = t; c.checked = keep ? prev.has(t) : i === 0; c.onchange = () => footChanged();
-    l.append(c, document.createTextNode(t)); box.append(l);
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "fp-item" + ((keep ? prev.has(t) : i === 0) ? " on" : "");
+    b.dataset.text = t; b.textContent = t;
+    b.onclick = () => { b.classList.toggle("on"); footChanged(); };
+    box.append(b);
   });
-  if (reset) { $("footOwnOn").checked = false; $("footOwn").value = ""; }
+  if (reset) { $("footOwnOn").classList.remove("on"); $("footOwn").value = ""; }
   footChanged();
 }
 function footChanged(focus) {
-  const own = $("footOwnOn").checked;
-  $("footOwn").hidden = !own && !$("footOwn").value;
+  const own = $("footOwnOn").classList.contains("on");
+  $("footOwn").hidden = !own;
   if (focus && own) $("footOwn").focus();
-  const n = selectedFoots().length;
-  $("footSum").textContent = n === 0 ? "keine" : n === 1 ? selectedFoots()[0] : `${n} Texte ausgewählt`;
 }
 function selectedFoots() {
-  const l = [...document.querySelectorAll("#footList input:checked")].map(c => c.value);
-  if ($("footOwnOn") && $("footOwnOn").checked && $("footOwn").value.trim()) l.push($("footOwn").value.trim());
+  const l = [...document.querySelectorAll("#footList .fp-item.on")].map(b => b.dataset.text);
+  if ($("footOwnOn").classList.contains("on") && $("footOwn").value.trim()) l.push($("footOwn").value.trim());
   return l;
 }
 const docTitle = () => ($("fTitle").value === CUSTOM ? $("fTitleCustom").value.trim() : $("fTitle").value) || titlesFromSettings()[0];
