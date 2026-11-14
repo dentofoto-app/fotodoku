@@ -58,7 +58,13 @@
   .doc-title select { font-size: 18px; font-weight: 600; padding: 6px 8px; max-width: 100%; color: #1d2a33; }
   .doc-title input { flex: 1; min-width: 220px; font-size: 18px; font-weight: 600; }
   .patient { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  #fNotes { height: 54px; margin-bottom: 14px; }
+  #fNotes { height: 54px; margin-bottom: 10px; }
+  .foot-pick { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px 8px; margin-bottom: 14px; }
+  .foot-pick summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 2px 0; }
+  .foot-pick summary b { color: #1d2a33; font-weight: 500; }
+  .foot-pick label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; padding: 5px 0; line-height: 1.3; }
+  .foot-pick input[type=checkbox] { width: 20px; height: 20px; flex: none; margin: 0; accent-color: var(--accent); }
+  .foot-pick input[type=text] { width: 100%; margin-top: 2px; }
 
   /* ---------- Bildraster ---------- */
   #grid { display: grid; gap: 16px; }
@@ -146,7 +152,7 @@
   </div>
   <div class="row">
     <div><label class="fl">Adresse / Kontakt (mehrzeilig)</label><textarea id="sAddr" placeholder="Musterstraße 1&#10;12345 Musterstadt&#10;Tel. 01234 / 56789"></textarea></div>
-    <div><label class="fl">Fußzeile (optional)</label><textarea id="sFoot" placeholder="z. B. Hinweis zur Vertraulichkeit"></textarea></div>
+    <div><label class="fl">Fußzeilen zur Auswahl (eine pro Zeile, die erste ist voreingestellt)</label><textarea id="sFoot" placeholder="z. B. Hinweis zur Vertraulichkeit"></textarea></div>
   </div>
   <div class="row">
     <div><label class="fl">PDF-Design</label>
@@ -189,6 +195,12 @@
   </div>
   <label class="fl">Bemerkungen (optional – erscheint nur im PDF, wenn ausgefüllt)</label>
   <textarea id="fNotes"></textarea>
+  <details class="foot-pick" id="footPick">
+    <summary>Fußzeile im PDF: <b id="footSum"></b></summary>
+    <div id="footList"></div>
+    <label><input type="checkbox" id="footOwnOn" onchange="footChanged(true)"> Eigener Text</label>
+    <input type="text" id="footOwn" placeholder="Eigenen Fußzeilen-Text eingeben" oninput="$('footOwnOn').checked = !!this.value.trim(); footChanged()" hidden>
+  </details>
   <div id="grid"></div>
 </div>
 
@@ -221,6 +233,13 @@
 <input type="file" id="logoFile" accept="image/*" hidden>
 
 <script>
+const DEFAULT_FOOTS = [
+  "Vertrauliche Patientenunterlage – nur für den persönlichen Gebrauch bestimmt.",
+  "Die Aufnahmen dienen der Dokumentation des Behandlungsverlaufs.",
+  "Bitte bewahren Sie diese Dokumentation für spätere Vergleichsaufnahmen auf.",
+  "Weitergabe an Dritte nur mit Einverständnis der Patientin bzw. des Patienten.",
+  "Die Fotos wurden nicht bearbeitet – nur zugeschnitten und ausgerichtet."
+];
 const DEFAULT_TITLES = ["Fotodokumentation – Ist-Zustand", "Fotodokumentation – Verlaufskontrolle", "Fotodokumentation – Behandlungsabschluss"];
 const DEFAULT_LABELS = [
   "# Gesicht", "Gesicht links", "Gesicht frontal", "Gesicht rechts", "Hinterkopf / Schulter / oberer Rücken",
@@ -245,7 +264,8 @@ function loadSettings() {
   $("sName").value = s.name || "";
   $("sTitles").value = (s.titles || (s.title ? [s.title, ...DEFAULT_TITLES.filter(t => t !== s.title)] : DEFAULT_TITLES)).join("\n");
   $("sAddr").value = s.addr || "";
-  $("sFoot").value = s.foot || "";
+  const foots = s.foots || (s.foot ? [s.foot.trim().replace(/\s*\n\s*/g, " · "), ...DEFAULT_FOOTS.filter(f => f !== s.foot.trim())] : DEFAULT_FOOTS);
+  $("sFoot").value = foots.join("\n");
   $("sDesign").value = s.design || "klar";
   $("sColor").value = s.color || "#1f6f8b";
   const lab = !s.labels || s.labels.join("|") === OLD_LABELS.join("|") ? DEFAULT_LABELS : s.labels;   // alte Vorgabe ersetzen
@@ -259,6 +279,7 @@ function applySettings() {
   $("pName").textContent = $("sName").value || "Zahnarztpraxis";
   $("pAddr").textContent = $("sAddr").value;
   fillTitles();
+  fillFoots();
 }
 function titlesFromSettings() {
   const l = $("sTitles").value.split("\n").map(x => x.trim()).filter(Boolean);
@@ -278,10 +299,35 @@ function titleChanged() {
   $("fTitleCustom").hidden = !custom;
   if (custom) $("fTitleCustom").focus();
 }
+function footsFromSettings() { return $("sFoot").value.split("\n").map(x => x.trim()).filter(Boolean); }
+function fillFoots(reset = false) {
+  const box = $("footList"), prev = new Set(selectedFoots()), list = footsFromSettings();
+  const keep = !reset && box.children.length;
+  box.innerHTML = "";
+  list.forEach((t, i) => {
+    const l = document.createElement("label"), c = document.createElement("input");
+    c.type = "checkbox"; c.value = t; c.checked = keep ? prev.has(t) : i === 0; c.onchange = () => footChanged();
+    l.append(c, document.createTextNode(t)); box.append(l);
+  });
+  if (reset) { $("footOwnOn").checked = false; $("footOwn").value = ""; }
+  footChanged();
+}
+function footChanged(focus) {
+  const own = $("footOwnOn").checked;
+  $("footOwn").hidden = !own && !$("footOwn").value;
+  if (focus && own) $("footOwn").focus();
+  const n = selectedFoots().length;
+  $("footSum").textContent = n === 0 ? "keine" : n === 1 ? selectedFoots()[0] : `${n} Texte ausgewählt`;
+}
+function selectedFoots() {
+  const l = [...document.querySelectorAll("#footList input:checked")].map(c => c.value);
+  if ($("footOwnOn") && $("footOwnOn").checked && $("footOwn").value.trim()) l.push($("footOwn").value.trim());
+  return l;
+}
 const docTitle = () => ($("fTitle").value === CUSTOM ? $("fTitleCustom").value.trim() : $("fTitle").value) || titlesFromSettings()[0];
 function saveSettings() {
   store.set("settings", {
-    name: $("sName").value, titles: titlesFromSettings(), addr: $("sAddr").value, foot: $("sFoot").value, design: $("sDesign").value, color: $("sColor").value,
+    name: $("sName").value, titles: titlesFromSettings(), addr: $("sAddr").value, foots: footsFromSettings(), design: $("sDesign").value, color: $("sColor").value,
     labels: labelsFromSettings(), cols: $("cols").value, orient: $("orient").value
   });
   applySettings();
@@ -588,6 +634,7 @@ function newPatient(ask = true) {
   $("fDate").value = isoToday();
   $("fTitleCustom").value = "";
   fillTitles(true);
+  fillFoots(true);
   slots = slotsFromSettings();
   draw();
   window.scrollTo(0, 0);
@@ -880,12 +927,19 @@ function renderPdf() {
   });
 
   /* --- Fußzeile: nur der Hinweistext, mittig (Seitenzahl nur bei mehreren Seiten) --- */
-  const foot = $("sFoot").value.trim().replace(/\s*\n\s*/g, " · ");
+  const footMax = (W - 2 * M) * 0.72, footSel = selectedFoots();
+  const footLines = [];                                    // Texte zu höchstens 3 Zeilen zusammenfassen
+  for (const f of footSel) {
+    const last = footLines[footLines.length - 1];
+    if (last && textW(last + "  ·  " + f, 7) <= footMax) footLines[footLines.length - 1] = last + "  ·  " + f;
+    else footLines.push(f);
+  }
+  if (footLines.length > 3) footLines.splice(2, footLines.length, footLines.slice(2).join("  ·  "));
   pages.forEach((p, i) => {
     pg = p;
     const fy = H - M + 14;
     if (design === "akzent") rect(0, H - 5, W, 5, ACC);
-    text(fit(foot, 7, false, (W - 2 * M) * 0.7), W / 2, fy, 7, { color: C_MUTED, align: "center" });
+    footLines.forEach((f, k) => text(fit(f, 7, false, footMax), W / 2, fy - (footLines.length - 1 - k) * 8.5 + (footLines.length > 1 ? 4 : 0), 7, { color: C_MUTED, align: "center" }));
     if (pages.length > 1) text(`Seite ${i + 1} von ${pages.length}`, W - M, fy, 7, { color: C_MUTED, align: "right" });
   });
   return buildPdf(W, H, pages, images);
