@@ -917,6 +917,29 @@ setLayout();
 newPatient(false);
 // Offline-Fähigkeit, wenn die App über eine Webadresse geöffnet wird (Home-Bildschirm)
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+
+// Geburtsdatum: Punkte werden automatisch gesetzt (TT.MM.JJJJ) – iPhone-Zahlentastatur hat keinen Punkt
+(() => {
+  const el = $("fBirth");
+  const fmt = d => d.slice(0, 2) + (d.length > 2 ? "." + d.slice(2, 4) : "") + (d.length > 4 ? "." + d.slice(4, 8) : "");
+  el.addEventListener("input", e => {
+    let v = el.value;
+    if (el.selectionStart !== v.length) return;          // mitten im Text bearbeiten: nicht eingreifen
+    // selbst getippter Trenner (Mac-Tastatur): einstellige Tage/Monate mit 0 auffüllen, z. B. "1." → "01"
+    if (e.data && /[.,\/\- ]/.test(e.data)) {
+      const parts = v.split(/[.,\/\- ]/);
+      v = parts.map((p, i) => i < parts.length - 1 && i < 2 && p.length === 1 ? "0" + p : p).join("");
+    }
+    el.value = fmt(v.replace(/\D/g, ""));
+  });
+  el.addEventListener("blur", () => {                     // z. B. "1.2.80" → "01.02.1980"
+    const m = el.value.trim().match(/^(\d{1,2})[.,\/\- ](\d{1,2})[.,\/\- ](\d{2}|\d{4})$/);
+    if (!m) return;
+    let y = m[3];
+    if (y.length === 2) y = (+y > new Date().getFullYear() % 100 ? "19" : "20") + y;
+    el.value = m[1].padStart(2, "0") + "." + m[2].padStart(2, "0") + "." + y;
+  });
+})();
 </script>
 </body>
 </html>
