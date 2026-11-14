@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Fotodokumentation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Fotodoku">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1f6f8b">
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  :root { --accent: #1f6f8b; --line: #d5dde3; --muted: #6b7a86; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #eef2f5; color: #1d2a33;
+         padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+  /* ---------- Werkzeugleiste ---------- */
+  .toolbar { position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid var(--line);
+             padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .toolbar h1 { font-size: 16px; margin: 0 12px 0 0; color: var(--accent); white-space: nowrap; }
+  .toolbar .sep { width: 1px; height: 26px; background: var(--line); margin: 0 4px; }
+  button { font: inherit; font-size: 14px; min-height: 36px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px;
+           background: #fff; cursor: pointer; color: inherit; touch-action: manipulation; }
+  button:hover { background: #f2f6f8; }
+  button:active { background: #e3edf2; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover, button.primary:active { background: #185a71; }
+  label.inline { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  select { font: inherit; font-size: 14px; min-height: 36px; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--line); background: #fff; }
+
+  /* ---------- Einstellungen ---------- */
+  #settings { display: none; max-width: 900px; margin: 16px auto 0; background: #fff; border: 1px solid var(--line);
+              border-radius: 10px; padding: 16px 20px; }
+  #settings.open { display: block; }
+  #settings h2 { font-size: 15px; margin: 0 0 10px; }
+  .row { display: flex; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 220px; }
+  .fl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  input[type=text], input[type=date], textarea { width: 100%; font: inherit; font-size: 15px; padding: 7px 9px;
+           border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); background: #f7fbfc; }
+  textarea { height: 64px; resize: vertical; }
+  .hint { font-size: 12px; color: var(--muted); }
+
+  /* ---------- Arbeitsbereich ---------- */
+  #doc { background: #fff; margin: 16px auto 40px; padding: 28px 32px; box-shadow: 0 2px 12px rgba(0,0,0,.08);
+         border-radius: 10px; width: min(calc(100% - 32px), 1100px); }
+  .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+              border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 12px; }
+  .doc-head img { max-height: 60px; max-width: 200px; object-fit: contain; }
+  .praxis { text-align: right; font-size: 13px; line-height: 1.35; white-space: pre-line; }
+  .praxis strong { font-size: 16px; color: var(--accent); }
+  .doc-title { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+  .doc-title select { font-size: 18px; font-weight: 600; padding: 6px 8px; max-width: 100%; color: #1d2a33; }
+  .doc-title input { flex: 1; min-width: 220px; font-size: 18px; font-weight: 600; }
+  .patient { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  #fNotes { height: 54px; margin-bottom: 14px; }
+
+  /* ---------- Bildraster ---------- */
+  #grid { display: grid; gap: 16px; }
+  .sec { grid-column: 1 / -1; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+         color: var(--accent); border-bottom: 1px solid var(--line); padding: 10px 0 4px; }
+  .sec:first-child { padding-top: 0; }
+  .slot { border: 1.5px dashed #b9c6cf; border-radius: 8px; background: #fafcfd; display: flex; flex-direction: column; min-width: 0; }
+  .slot.filled { border-style: solid; border-color: var(--line); background: #fff; }
+  .slot.dragover { border-color: var(--accent); background: #e9f4f8; }
+  .slot .pic { aspect-ratio: 3 / 2; display: flex; align-items: center; justify-content: center; overflow: hidden;
+               border-radius: 7px 7px 0 0; cursor: pointer; background: #f4f7f9; }
+  .slot.filled .pic { background: #111; }
+  .slot .pic img { width: 100%; height: 100%; object-fit: contain; display: block; -webkit-user-drag: element; }
+  .slot .empty { text-align: center; color: #8d9ba5; font-size: 13px; padding: 8px; }
+  .slot .empty b { display: block; font-size: 30px; font-weight: 300; }
+  .slot .cap { text-align: center; font-weight: 600; border: none; border-radius: 0; padding: 6px; font-size: 14px; background: transparent; }
+  .slot .tools { display: flex; justify-content: center; flex-wrap: wrap; gap: 3px; padding: 0 6px 8px; }
+  .slot .tools button { min-height: 34px; min-width: 33px; padding: 2px 4px; font-size: 15px; }
+  .slot .tools button.del { color: #b3261e; }
+  .slot .tools .gap { flex: 0 0 6px; }
+
+  /* Kamera-Taste nur auf Geräten mit Touch (iPad/iPhone) */
+  @media (pointer: fine) { .cam { display: none; } }
+
+  /* ---------- Bearbeiten / Zuschneiden ---------- */
+  #editor { position: fixed; inset: 0; z-index: 100; background: #15191c; display: flex; flex-direction: column;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #editor[hidden] { display: none; }
+  .ed-bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; padding: 10px; }
+  .ed-bar button, .ed-bar select { background: #2a3136; color: #fff; border-color: #3a434a; }
+  .ed-bar button:hover, .ed-bar button:active { background: #3a434a; }
+  .ed-bar button.primary { background: var(--accent); border-color: var(--accent); }
+  .ed-hint { color: #9aa7b0; font-size: 13px; width: 100%; text-align: center; }
+  #edWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #edCanvas { touch-action: none; display: block; }
+
+  #busy { display: none; position: fixed; inset: 0; background: rgba(255,255,255,.7); z-index: 50;
+          align-items: center; justify-content: center; font-size: 17px; color: var(--accent); }
+  #busy.on { display: flex; }
+
+  /* ---------- kleine Bildschirme (iPhone) ---------- */
+  @media (max-width: 700px) {
+    .toolbar { padding: 8px 10px; gap: 6px; }
+    .toolbar h1 { width: 100%; margin: 0; }
+    .toolbar .sep, .toolbar .spacer { display: none; }
+    .toolbar .wide { flex: 1 1 45%; }
+    #doc { width: auto; margin: 10px; padding: 14px; }
+    .patient { grid-template-columns: 1fr 1fr; }
+    .patient > div:first-child { grid-column: 1 / -1; }
+    #grid { grid-template-columns: 1fr !important; gap: 14px; }
+    .doc-head img { max-height: 44px; max-width: 120px; }
+    .slot .tools { gap: 3px; padding: 0 4px 8px; }
+    .slot .tools button { min-width: 32px; padding: 2px 4px; }
+    .slot .tools .gap { flex-basis: 2px; }
+    input[type=text], input[type=date], textarea, select { font-size: 16px; } /* verhindert Auto-Zoom auf iOS */
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>🦷 Fotodokumentation</h1>
+  <button class="primary wide cam" onclick="takePhoto()">📸 Foto aufnehmen</button>
+  <button class="primary wide" onclick="pickFiles()">🖼 Bilder hinzufügen</button>
+  <button class="wide" onclick="addSlot()">＋ Leeres Feld</button>
+  <span class="sep"></span>
+  <label class="inline">Spalten
+    <select id="cols" onchange="setLayout()"><option>2</option><option selected>3</option><option>4</option></select>
+  </label>
+  <label class="inline">PDF
+    <select id="orient" onchange="setLayout()"><option value="portrait">Hochformat</option><option value="landscape" selected>Querformat</option></select>
+  </label>
+  <span class="sep"></span>
+  <button onclick="toggleSettings()">⚙︎ Praxisdaten</button>
+  <button onclick="newPatient()">🗑 Neuer Patient</button>
+  <span class="spacer" style="flex:1"></span>
+  <button class="primary wide" onclick="makePdf()">📄 PDF erstellen</button>
+</div>
+
+<div id="settings">
+  <h2>Praxisdaten (werden auf diesem Gerät gespeichert)</h2>
+  <div class="row">
+    <div><label class="fl">Praxisname</label><input type="text" id="sName" placeholder="Zahnarztpraxis Dr. Muster"></div>
+    <div><label class="fl">Titel zur Auswahl (einer pro Zeile, der erste ist voreingestellt)</label><textarea id="sTitles"></textarea></div>
+  </div>
+  <div class="row">
+    <div><label class="fl">Adresse / Kontakt (mehrzeilig)</label><textarea id="sAddr" placeholder="Musterstraße 1&#10;12345 Musterstadt&#10;Tel. 01234 / 56789"></textarea></div>
+    <div><label class="fl">Fußzeile (optional)</label><textarea id="sFoot" placeholder="z. B. Hinweis zur Vertraulichkeit"></textarea></div>
+  </div>
+  <div class="row">
+    <div><label class="fl">PDF-Design</label>
+      <select id="sDesign">
+        <option value="klar">Klar – hell und sachlich</option>
+        <option value="akzent">Akzent – farbiger Kopfbereich</option>
+        <option value="elegant">Elegant – zentriert, mit Serifenschrift</option>
+      </select></div>
+    <div><label class="fl">Praxisfarbe</label>
+      <input type="color" id="sColor" value="#1f6f8b" style="width:60px;height:36px;padding:2px;border:1px solid var(--line);border-radius:8px;background:#fff">
+      <button onclick="$('sColor').value='#1f6f8b'">Standard</button></div>
+  </div>
+  <div class="row">
+    <div><label class="fl">Bilder in dieser Reihenfolge (eine Zeile pro Bild · Zeilen mit # davor sind Gruppen-Überschriften)</label>
+      <textarea id="sLabels" style="height:260px"></textarea></div>
+    <div><label class="fl">Logo</label>
+      <button onclick="document.getElementById('logoFile').click()">Logo auswählen…</button>
+      <button onclick="setLogo('')">Logo entfernen</button>
+      <p class="hint">Die Beschriftungen werden bei „Neuer Patient“ übernommen. Patientendaten und Bilder werden <b>nicht</b> gespeichert und verlassen das Gerät nicht.</p>
+    </div>
+  </div>
+  <button class="primary" onclick="saveSettings()">Speichern</button>
+  <button onclick="toggleSettings(false)">Schließen</button>
+</div>
+
+<div id="doc">
+  <div class="doc-head">
+    <div><img id="logo" alt="" style="display:none"></div>
+    <div class="praxis"><strong id="pName"></strong>
+<span id="pAddr"></span></div>
+  </div>
+  <div class="doc-title">
+    <select id="fTitle" onchange="titleChanged()" aria-label="Dokumenttitel"></select>
+    <input type="text" id="fTitleCustom" placeholder="Eigenen Titel eingeben" hidden>
+  </div>
+  <div class="patient">
+    <div><label class="fl">Patient</label><input type="text" id="fName" placeholder="Name" autocomplete="off"></div>
+    <div><label class="fl">Geb.-Datum</label><input type="text" id="fBirth" placeholder="TT.MM.JJJJ" inputmode="numeric" autocomplete="off"></div>
+    <div><label class="fl">Aufnahme vom</label><input type="date" id="fDate"></div>
+  </div>
+  <label class="fl">Bemerkungen (optional – erscheint nur im PDF, wenn ausgefüllt)</label>
+  <textarea id="fNotes"></textarea>
+  <div id="grid"></div>
+</div>
+
+<div id="editor" hidden>
+  <div class="ed-bar">
+    <button onclick="edRotate(-1)" title="Nach links drehen">⟲</button>
+    <button onclick="edRotate(1)" title="Nach rechts drehen">⟳</button>
+    <button onclick="edFlip('h')" title="Spiegeln links/rechts">⇋ Spiegeln</button>
+    <button onclick="edFlip('v')" title="Spiegeln oben/unten">⇅ Spiegeln</button>
+    <select id="edRatio" onchange="edSetRatio()" aria-label="Seitenverhältnis">
+      <option value="1.5">Querformat 3:2</option>
+      <option value="0.6667">Hochformat 2:3</option>
+      <option value="0">Freies Format</option>
+    </select>
+    <button onclick="edReset()">↺ Original</button>
+    <div class="ed-hint">Rahmen an den Ecken ziehen zum Zuschneiden · in der Mitte ziehen zum Verschieben</div>
+  </div>
+  <div id="edWrap"><canvas id="edCanvas"></canvas></div>
+  <div class="ed-bar">
+    <button onclick="edClose()">Abbrechen</button>
+    <button class="primary" onclick="edApply(false)">✓ Übernehmen</button>
+    <button class="primary" id="edNext" onclick="edApply(true)">✓ Übernehmen &amp; nächstes Foto</button>
+  </div>
+</div>
+
+<div id="busy">PDF wird erstellt …</div>
+<input type="file" id="files" accept="image/*" multiple hidden>
+<input type="file" id="camFile" accept="image/*" capture="environment" hidden>
+<input type="file" id="oneFile" accept="image/*" hidden>
+<input type="file" id="logoFile" accept="image/*" hidden>
+
+<script>
+const DEFAULT_TITLES = ["Fotodokumentation – Ist-Zustand", "Fotodokumentation – Verlaufskontrolle", "Fotodokumentation – Behandlungsabschluss"];
+const DEFAULT_LABELS = [
+  "# Gesicht", "Gesicht links", "Gesicht frontal", "Gesicht rechts", "Hinterkopf / Schulter / oberer Rücken",
+  "# Zähne – Kiefer geschlossen", "Links", "Frontal", "Rechts",
+  "# Zähne – Mund geöffnet", "Oberkiefer", "Unterkiefer",
+  "# Nase", "Nasenöffnung"];
+const OLD_LABELS = ["Rechts lateral", "Frontal", "Links lateral", "Oberkiefer okklusal", "Unterkiefer okklusal", "Detail"];
+const MAX_SIDE = 2000;           // Bilder werden verkleinert -> kleine PDF-Dateien, wenig Speicher auf dem iPhone
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("zfd_" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("zfd_" + k, JSON.stringify(v)); } catch (e) { alert("Speichern nicht möglich (evtl. Logo zu groß)."); } }
+};
+let slots = [];
+let nextId = 1;
+let targetSlot = null;
+let dragFrom = null;
+const $ = id => document.getElementById(id);
+
+/* ---------- Praxisdaten ---------- */
+function loadSettings() {
+  const s = store.get("settings", {});
+  $("sName").value = s.name || "";
+  $("sTitles").value = (s.titles || (s.title ? [s.title, ...DEFAULT_TITLES.filter(t => t !== s.title)] : DEFAULT_TITLES)).join("\n");
+  $("sAddr").value = s.addr || "";
+  $("sFoot").value = s.foot || "";
+  $("sDesign").value = s.design || "klar";
+  $("sColor").value = s.color || "#1f6f8b";
+  const lab = !s.labels || s.labels.join("|") === OLD_LABELS.join("|") ? DEFAULT_LABELS : s.labels;   // alte Vorgabe ersetzen
+  $("sLabels").value = lab.join("\n");
+  $("cols").value = s.cols || "3";
+  $("orient").value = s.orient || "landscape";
+  applySettings();
+  setLogo(store.get("logo", ""), false);
+}
+function applySettings() {
+  $("pName").textContent = $("sName").value || "Zahnarztpraxis";
+  $("pAddr").textContent = $("sAddr").value;
+  fillTitles();
+}
+function titlesFromSettings() {
+  const l = $("sTitles").value.split("\n").map(x => x.trim()).filter(Boolean);
+  return l.length ? l : DEFAULT_TITLES;
+}
+const CUSTOM = "__custom__";
+function fillTitles(reset = false) {
+  const sel = $("fTitle"), prev = sel.value, list = titlesFromSettings();
+  sel.innerHTML = "";
+  for (const t of list) sel.add(new Option(t, t));
+  sel.add(new Option("✎ Eigener Titel …", CUSTOM));
+  sel.value = !reset && [...sel.options].some(o => o.value === prev) ? prev : list[0];
+  titleChanged();
+}
+function titleChanged() {
+  const custom = $("fTitle").value === CUSTOM;
+  $("fTitleCustom").hidden = !custom;
+  if (custom) $("fTitleCustom").focus();
+}
+const docTitle = () => ($("fTitle").value === CUSTOM ? $("fTitleCustom").value.trim() : $("fTitle").value) || titlesFromSettings()[0];
+function saveSettings() {
+  store.set("settings", {
+    name: $("sName").value, titles: titlesFromSettings(), addr: $("sAddr").value, foot: $("sFoot").value, design: $("sDesign").value, color: $("sColor").value,
+    labels: labelsFromSettings(), cols: $("cols").value, orient: $("orient").value
+  });
+  applySettings();
+  toggleSettings(false);
+}
+function labelsFromSettings() {
+  const l = $("sLabels").value.split("\n").map(x => x.trim()).filter(Boolean);
+  return l.length ? l : DEFAULT_LABELS;
+}
+function toggleSettings(force) { $("settings").classList.toggle("open", force); }
+function setLogo(src, save = true) {
+  const img = $("logo");
+  img.src = src || ""; img.style.display = src ? "" : "none";
+  if (save) store.set("logo", src || "");
+}
+$("logoFile").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const c = await loadImage(f, 600); setLogo(c.toDataURL("image/png")); } catch (err) { alert(err.message); }
+  e.target.value = "";
+};
+
+/* ---------- Layout ---------- */
+function setLayout() {
+  $("grid").style.gridTemplateColumns = `repeat(${$("cols").value}, 1fr)`;
+  const s = store.get("settings", {}); s.cols = $("cols").value; s.orient = $("orient").value; store.set("settings", s);
+}
+
+/* ---------- Bilder ---------- */
+// Lädt ein Foto und verkleinert es sofort (spart auf iPhone/iPad viel Arbeitsspeicher)
+function loadImage(file, maxSide = MAX_SIDE) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      const ctx = c.getContext("2d"); ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("Bild konnte nicht gelesen werden: " + file.name)); };
+    img.src = url;
+  });
+}
+// Zeichnet ein Bild gedreht/gespiegelt auf eine neue Leinwand
+function transform(src, rot, flipH, flipV) {
+  const swap = rot % 180 !== 0;
+  const c = document.createElement("canvas");
+  c.width = swap ? src.height : src.width; c.height = swap ? src.width : src.height;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.translate(c.width / 2, c.height / 2);
+  ctx.rotate(rot * Math.PI / 180);
+  ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+  ctx.drawImage(src, -src.width / 2, -src.height / 2);
+  return c;
+}
+function update(slot) {
+  if (!slot.img) { slot.out = null; return; }
+  const c = transform(slot.img, slot.rot, slot.flipH, slot.flipV);
+  slot.out = c.toDataURL("image/jpeg", 0.9); slot.w = c.width; slot.h = c.height;
+}
+
+function makeSlot(label, section = "") { return { id: nextId++, label, section, img: null, rot: 0, flipH: false, flipV: false, out: null }; }
+const EXTRA = "Weitere Aufnahmen";
+const extraSlot = () => makeSlot("Weitere Aufnahme", slots.some(s => s.section) ? EXTRA : "");
+// Liest die Liste aus den Einstellungen: "# Überschrift" startet eine Gruppe
+function slotsFromSettings() {
+  let section = "";
+  const out = [];
+  for (const l of labelsFromSettings()) {
+    if (l.startsWith("#")) section = l.replace(/^#+\s*/, "");
+    else out.push(makeSlot(l, section));
+  }
+  return out.length ? out : [makeSlot("Aufnahme 1")];
+}
+function addSlot() { slots.push(extraSlot()); draw(); }
+
+async function assign(slot, file) {
+  try {
+    slot.img = slot.orig = await loadImage(file);
+    slot.rot = 0; slot.flipH = slot.flipV = false;
+    update(slot);
+    return true;
+  } catch (e) { alert(e.message); return false; }
+}
+async function addFiles(files, startSlot) {
+  files = [...files].filter(f => f.type.startsWith("image/") || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name));
+  files.sort((a, b) => a.name.localeCompare(b.name, "de", { numeric: true }));
+  let i = startSlot ? slots.indexOf(startSlot) : 0;
+  for (const f of files) {
+    while (i < slots.length && slots[i].img && !(startSlot && slots[i] === startSlot)) i++;
+    if (i >= slots.length) slots.push(extraSlot());
+    await assign(slots[i], f);
+    startSlot = null; i++;
+  }
+  draw();
+}
+function pickFiles() { $("files").click(); }
+$("files").onchange = e => { addFiles(e.target.files); e.target.value = ""; };
+$("oneFile").onchange = async e => {
+  if (e.target.files[0] && targetSlot) { await assign(targetSlot, e.target.files[0]); draw(); }
+  e.target.value = "";
+};
+
+/* ---------- Kamera (Fotos landen NICHT in der Mediathek) ---------- */
+function takePhoto() { $("camFile").click(); }
+$("camFile").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  let slot = slots.find(s => !s.img);
+  if (!slot) { slot = extraSlot(); slots.push(slot); }
+  if (await assign(slot, f)) { draw(); edOpen(slot, true); }
+};
+
+/* ---------- Bearbeiten / Zuschneiden ---------- */
+const ed = { slot: null, src: null, crop: null, ratio: 1.5, scale: 1, drag: null };
+function edOpen(slot, fromCamera) {
+  ed.slot = slot;
+  ed.src = transform(slot.img, slot.rot, slot.flipH, slot.flipV);
+  edAutoRatio();
+  edInitCrop();
+  $("edNext").hidden = !fromCamera;
+  $("editor").hidden = false;
+  document.body.style.overflow = "hidden";
+  requestAnimationFrame(edLayout);
+}
+function edClose() { $("editor").hidden = true; document.body.style.overflow = ""; ed.slot = null; }
+function edInitCrop() {
+  const W = ed.src.width, H = ed.src.height;
+  if (!ed.ratio) { ed.crop = { x: 0, y: 0, w: W, h: H }; return; }
+  let w = W, h = w / ed.ratio;
+  if (h > H) { h = H; w = h * ed.ratio; }
+  ed.crop = { x: (W - w) / 2, y: (H - h) / 2, w, h };
+}
+function edLayout() {
+  if ($("editor").hidden) return;
+  const wrap = $("edWrap"), c = $("edCanvas"), dpr = window.devicePixelRatio || 1;
+  ed.scale = Math.min((wrap.clientWidth - 24) / ed.src.width, (wrap.clientHeight - 24) / ed.src.height);
+  const w = ed.src.width * ed.scale, h = ed.src.height * ed.scale;
+  c.style.width = w + "px"; c.style.height = h + "px";
+  c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  edDraw();
+}
+window.addEventListener("resize", edLayout);
+function edDraw() {
+  const c = $("edCanvas"), x = c.getContext("2d"), k = c.width / ed.src.width, dpr = window.devicePixelRatio || 1;
+  x.drawImage(ed.src, 0, 0, c.width, c.height);
+  const X = ed.crop.x * k, Y = ed.crop.y * k, w = ed.crop.w * k, h = ed.crop.h * k;
+  x.fillStyle = "rgba(0,0,0,.6)";
+  x.fillRect(0, 0, c.width, Y); x.fillRect(0, Y + h, c.width, c.height - Y - h);
+  x.fillRect(0, Y, X, h); x.fillRect(X + w, Y, c.width - X - w, h);
+  x.strokeStyle = "rgba(255,255,255,.45)"; x.lineWidth = dpr;
+  x.beginPath();
+  for (const t of [1 / 3, 2 / 3]) { x.moveTo(X + w * t, Y); x.lineTo(X + w * t, Y + h); x.moveTo(X, Y + h * t); x.lineTo(X + w, Y + h * t); }
+  x.stroke();
+  x.strokeStyle = "#fff"; x.lineWidth = 2 * dpr; x.strokeRect(X, Y, w, h);
+  const L = 22 * dpr, T = 5 * dpr; x.fillStyle = "#fff";
+  for (const [cx, cy, sx, sy] of [[X, Y, 1, 1], [X + w, Y, -1, 1], [X + w, Y + h, -1, -1], [X, Y + h, 1, -1]]) {
+    x.fillRect(sx > 0 ? cx - T / 2 : cx - L + T / 2, cy - T / 2 * sy, L, T * sy);
+    x.fillRect(cx - T / 2 * sx, sy > 0 ? cy - T / 2 : cy - L + T / 2, T * sx, L);
+  }
+}
+function edPoint(e) {
+  const r = $("edCanvas").getBoundingClientRect();
+  return { x: (e.clientX - r.left) / ed.scale, y: (e.clientY - r.top) / ed.scale };
+}
+const CORNERS = [[0, 0, -1, -1], [1, 0, 1, -1], [1, 1, 1, 1], [0, 1, -1, 1]]; // Lage im Rahmen + Zugrichtung
+$("edCanvas").addEventListener("pointerdown", e => {
+  const p = edPoint(e), c = ed.crop, hit = 30 / ed.scale;
+  let mode = null;
+  CORNERS.forEach(([fx, fy, sx, sy], i) => {
+    if (mode === null && Math.abs(p.x - (c.x + fx * c.w)) < hit && Math.abs(p.y - (c.y + fy * c.h)) < hit) mode = i;
+  });
+  if (mode === null && p.x > c.x && p.x < c.x + c.w && p.y > c.y && p.y < c.y + c.h) mode = "move";
+  if (mode === null) return;
+  ed.drag = { mode, p, crop: { ...c } };
+  e.target.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+$("edCanvas").addEventListener("pointermove", e => {
+  if (!ed.drag) return;
+  const W = ed.src.width, H = ed.src.height, p = edPoint(e), d = ed.drag, c0 = d.crop;
+  if (d.mode === "move") {
+    ed.crop.x = Math.min(Math.max(0, c0.x + p.x - d.p.x), W - c0.w);
+    ed.crop.y = Math.min(Math.max(0, c0.y + p.y - d.p.y), H - c0.h);
+  } else {
+    const [fx, fy, sx, sy] = CORNERS[d.mode];
+    const ax = c0.x + (1 - fx) * c0.w, ay = c0.y + (1 - fy) * c0.h;   // gegenüberliegende Ecke bleibt fest
+    const min = Math.max(40, Math.min(W, H) * 0.08);
+    let w = Math.min(Math.max(min, (p.x - ax) * sx), sx > 0 ? W - ax : ax);
+    let h = Math.min(Math.max(min, (p.y - ay) * sy), sy > 0 ? H - ay : ay);
+    if (ed.ratio) { if (w / h > ed.ratio) w = h * ed.ratio; else h = w / ed.ratio; }
+    ed.crop = { x: sx > 0 ? ax : ax - w, y: sy > 0 ? ay : ay - h, w, h };
+  }
+  edDraw();
+});
+const edEnd = () => ed.drag = null;
+$("edCanvas").addEventListener("pointerup", edEnd);
+$("edCanvas").addEventListener("pointercancel", edEnd);
+// Passendes Format zum Foto vorschlagen (Hochformat-Foto -> 2:3), außer "Frei" ist gewählt
+function edAutoRatio() {
+  if ($("edRatio").value !== "0") $("edRatio").value = ed.src.height > ed.src.width ? "0.6667" : "1.5";
+  ed.ratio = +$("edRatio").value;
+}
+function edRotate(dir) { ed.src = transform(ed.src, dir > 0 ? 90 : 270, false, false); edAutoRatio(); edInitCrop(); edLayout(); }
+function edFlip(axis) {
+  ed.src = transform(ed.src, 0, axis === "h", axis === "v");
+  const c = ed.crop, W = ed.src.width, H = ed.src.height;
+  if (axis === "h") c.x = W - c.x - c.w; else c.y = H - c.y - c.h;
+  edDraw();
+}
+function edSetRatio() { ed.ratio = +$("edRatio").value; edInitCrop(); edDraw(); }
+function edReset() { ed.src = transform(ed.slot.orig, 0, false, false); edAutoRatio(); edInitCrop(); edLayout(); }
+function edApply(next) {
+  const s = ed.slot, c = ed.crop, out = document.createElement("canvas");
+  out.width = Math.round(c.w); out.height = Math.round(c.h);
+  out.getContext("2d").drawImage(ed.src, Math.round(c.x), Math.round(c.y), out.width, out.height, 0, 0, out.width, out.height);
+  s.img = out; s.rot = 0; s.flipH = s.flipV = false;
+  update(s);
+  edClose(); draw();
+  if (next) takePhoto();
+}
+
+const IMG_KEYS = ["img", "orig", "rot", "flipH", "flipV", "out", "w", "h"];
+function swapImages(a, b) { for (const k of IMG_KEYS) [a[k], b[k]] = [b[k], a[k]]; }
+
+function action(id, what) {
+  const i = slots.findIndex(x => x.id === id); if (i < 0) return;
+  const s = slots[i];
+  if (what === "left") s.rot = (s.rot + 270) % 360;
+  if (what === "right") s.rot = (s.rot + 90) % 360;
+  if (what === "flipH") s.flipH = !s.flipH;
+  if (what === "flipV") s.flipV = !s.flipV;
+  if (what === "prev" && i > 0) swapImages(s, slots[i - 1]);
+  if (what === "next" && i < slots.length - 1) swapImages(s, slots[i + 1]);
+  if (what === "crop") return edOpen(s, false);
+  if (what === "clear") { s.img = s.orig = null; s.out = null; }
+  if (what === "remove") slots.splice(i, 1);
+  if (["left", "right", "flipH", "flipV"].includes(what)) update(s);
+  draw();
+}
+
+/* ---------- Darstellung ---------- */
+function draw() {
+  const g = $("grid"); g.innerHTML = "";
+  let lastSec = null;
+  slots.forEach((s, idx) => {
+    if (s.section && s.section !== lastSec) {
+      const h = document.createElement("div"); h.className = "sec"; h.textContent = s.section; g.appendChild(h);
+    }
+    lastSec = s.section;
+    const el = document.createElement("div");
+    el.className = "slot" + (s.img ? " filled" : "");
+    el.innerHTML = `
+      <div class="pic" title="${s.img ? "Tippen/Klicken zum Ersetzen" : "Tippen/Klicken oder Bild hierher ziehen"}">
+        ${s.out ? `<img src="${s.out}" draggable="true" alt="">` : `<div class="empty"><b>＋</b>Bild auswählen</div>`}
+      </div>
+      <input type="text" class="cap">
+      <div class="tools">
+        ${s.img ? `
+        <button title="Mit vorherigem Bild tauschen" data-a="prev" ${idx === 0 ? "disabled" : ""}>◀</button>
+        <button title="Zuschneiden / bearbeiten" data-a="crop">✂</button>
+        <button title="Nach links drehen" data-a="left">⟲</button>
+        <button title="Nach rechts drehen" data-a="right">⟳</button>
+        <button title="Spiegeln links/rechts (Spiegelaufnahme)" data-a="flipH">⇋</button>
+        <button title="Spiegeln oben/unten (Spiegelaufnahme)" data-a="flipV">⇅</button>
+        <button title="Mit nächstem Bild tauschen" data-a="next" ${idx === slots.length - 1 ? "disabled" : ""}>▶</button>
+        <span class="gap"></span>
+        <button title="Bild entfernen" data-a="clear" class="del">✕</button>` :
+        `<button title="Feld löschen" data-a="remove" class="del">✕ Feld löschen</button>`}
+      </div>`;
+    const cap = el.querySelector(".cap");
+    cap.value = s.label;
+    cap.oninput = () => s.label = cap.value;
+    el.querySelectorAll(".tools button").forEach(b => b.onclick = () => action(s.id, b.dataset.a));
+    const pic = el.querySelector(".pic");
+    pic.onclick = () => { targetSlot = s; $("oneFile").click(); };
+    const im = pic.querySelector("img");
+    if (im) im.ondragstart = e => { dragFrom = s; e.dataTransfer.effectAllowed = "move"; };
+    el.ondragover = e => { e.preventDefault(); el.classList.add("dragover"); };
+    el.ondragleave = () => el.classList.remove("dragover");
+    el.ondrop = e => {
+      e.preventDefault(); e.stopPropagation(); el.classList.remove("dragover");
+      if (dragFrom && dragFrom !== s) { swapImages(s, dragFrom); dragFrom = null; draw(); return; }
+      dragFrom = null;
+      if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files, s);
+    };
+    g.appendChild(el);
+  });
+}
+// Bilder irgendwo ins Fenster ziehen -> freie Felder füllen
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => { e.preventDefault(); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+/* ---------- Patient ---------- */
+function isoToday() { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+function deDate(iso) { if (!iso) return ""; const [y, m, d] = iso.split("-"); return `${d}.${m}.${y}`; }
+function newPatient(ask = true) {
+  if (ask && slots.some(s => s.img) && !confirm("Alle Bilder und Patientendaten verwerfen?")) return;
+  ["fName", "fBirth", "fNotes"].forEach(id => $(id).value = "");
+  $("fDate").value = isoToday();
+  $("fTitleCustom").value = "";
+  fillTitles(true);
+  slots = slotsFromSettings();
+  draw();
+  window.scrollTo(0, 0);
+}
+
+/* =====================================================================
+   PDF-Erzeugung (ohne Druckdialog, ohne Internet, ohne Fremdbibliothek)
+   ===================================================================== */
+const WINANSI = { "€": 128, "‚": 130, "„": 132, "…": 133, "•": 149, "–": 150, "—": 151, "‘": 145, "’": 146, "“": 147, "”": 148 };
+function winAnsi(s) {
+  let o = "";
+  for (const ch of s.normalize("NFC")) {
+    const c = ch.codePointAt(0);
+    o += WINANSI[ch] ? String.fromCharCode(WINANSI[ch]) : (c < 256 ? ch : "?");
+  }
+  return o;
+}
+const pdfStr = s => "(" + winAnsi(s).replace(/[\\()]/g, m => "\\" + m).replace(/\r?\n/g, " ") + ")";
+const measureCtx = document.createElement("canvas").getContext("2d");
+function textW(s, size, bold, serif) {
+  measureCtx.font = `${bold ? "bold " : ""}100px ${serif ? '"Times New Roman", Times, serif' : "Helvetica, Arial, sans-serif"}`;
+  return measureCtx.measureText(s).width * size / 100;
+}
+function wrap(s, size, bold, maxW) {
+  const lines = [];
+  for (const para of s.split(/\r?\n/)) {
+    let line = "";
+    for (const word of para.split(/\s+/)) {
+      const t = line ? line + " " + word : word;
+      if (line && textW(t, size, bold) > maxW) { lines.push(line); line = word; } else line = t;
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+const f2 = n => (Math.round(n * 100) / 100).toString();
+const C_ACCENT = [0.122, 0.435, 0.545], C_TEXT = [0.114, 0.165, 0.2], C_MUTED = [0.45, 0.5, 0.545];
+const C_LINE = [0.85, 0.88, 0.9], C_TINT = [0.953, 0.966, 0.973], C_IMGBG = [0.925, 0.937, 0.945];
+
+function buildPdf(W, H, pages, images) {
+  const parts = []; let len = 0; const offs = [];
+  const put = x => { parts.push(x); len += x.length; };       // alle Strings sind Latin-1 (1 Zeichen = 1 Byte)
+  const obj = (n, ...body) => { offs[n] = len; put(`${n} 0 obj\n`); body.forEach(put); put("\nendobj\n"); };
+  put("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  const firstImg = 7, firstPage = firstImg + images.length;
+  const pageIds = pages.map((_, i) => firstPage + i * 2);
+  obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2, `<< /Type /Pages /Kids [${pageIds.map(i => i + " 0 R").join(" ")}] /Count ${pages.length} >>`);
+  obj(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  obj(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  obj(5, "<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>");
+  obj(6, "<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>");
+  images.forEach((im, i) => obj(firstImg + i,
+    `<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${im.bytes.length} >>\nstream\n`,
+    im.bytes, "\nendstream"));
+  const xo = images.map((_, i) => `/Im${i} ${firstImg + i} 0 R`).join(" ");
+  pages.forEach((p, i) => {
+    const id = pageIds[i];
+    obj(id, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f2(W)} ${f2(H)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> /XObject << ${xo} >> >> /Contents ${id + 1} 0 R >>`);
+    obj(id + 1, `<< /Length ${p.ops.length} >>\nstream\n`, p.ops, "\nendstream");
+  });
+  const n = firstPage + pages.length * 2, xref = len;
+  let x = `xref\n0 ${n}\n0000000000 65535 f \n`;
+  for (let i = 1; i < n; i++) x += String(offs[i]).padStart(10, "0") + " 00000 n \n";
+  put(x + `trailer\n<< /Size ${n} /Root 1 0 R /Info << /Producer (Fotodokumentation) >> >>\nstartxref\n${xref}\n%%EOF\n`);
+  const bytes = new Uint8Array(len); let o = 0;
+  for (const p of parts) { for (let i = 0; i < p.length; i++) bytes[o++] = p.charCodeAt(i) & 255; }
+  return new Blob([bytes], { type: "application/pdf" });
+}
+
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+const mix = (c, t) => c.map(v => v + (1 - v) * t);          // Farbe aufhellen (t = 0 … 1)
+
+function renderPdf() {
+  const land = $("orient").value === "landscape";
+  const W = land ? 841.89 : 595.28, H = land ? 595.28 : 841.89, mm = 72 / 25.4, M = 14 * mm;
+  const design = $("sDesign").value || "klar";
+  const ACC = hexRgb($("sColor").value || "#1f6f8b"), TINT = mix(ACC, 0.93), WHITE = [1, 1, 1];
+  const pages = [], images = [];
+  let pg;
+  const newPage = () => { pg = { ops: "" }; pages.push(pg); };
+  const col = c => c.map(f2).join(" ");
+  const text = (s, x, y, size, { bold = false, serif = false, color = C_TEXT, align = "left", tc = 0 } = {}) => {
+    if (!s) return 0;
+    const w = textW(s, size, bold, serif) + tc * [...s].length;
+    if (align === "right") x -= w; else if (align === "center") x -= w / 2;
+    const f = serif ? (bold ? "F4" : "F3") : (bold ? "F2" : "F1");
+    pg.ops += `BT /${f} ${size} Tf ${f2(tc)} Tc ${col(color)} rg ${f2(x)} ${f2(H - y)} Td ${pdfStr(s)} Tj ET\n`;
+    return w;
+  };
+  const fit = (s, size, bold, maxW, serif) => { while (s && textW(s, size, bold, serif) > maxW) s = s.slice(0, -2) + "…"; return s; };
+  const rr = (x, y, w, h, r) => {
+    const k = 0.5523 * r, X = x, Y = H - y - h, n = f2;
+    return `${n(X + r)} ${n(Y)} m ${n(X + w - r)} ${n(Y)} l ${n(X + w - r + k)} ${n(Y)} ${n(X + w)} ${n(Y + r - k)} ${n(X + w)} ${n(Y + r)} c ` +
+      `${n(X + w)} ${n(Y + h - r)} l ${n(X + w)} ${n(Y + h - r + k)} ${n(X + w - r + k)} ${n(Y + h)} ${n(X + w - r)} ${n(Y + h)} c ` +
+      `${n(X + r)} ${n(Y + h)} l ${n(X + r - k)} ${n(Y + h)} ${n(X)} ${n(Y + h - r + k)} ${n(X)} ${n(Y + h - r)} c ` +
+      `${n(X)} ${n(Y + r)} l ${n(X)} ${n(Y + r - k)} ${n(X + r - k)} ${n(Y)} ${n(X + r)} ${n(Y)} c h `;
+  };
+  const fillRR = (x, y, w, h, r, c) => pg.ops += `${col(c)} rg ${rr(x, y, w, h, r)}f\n`;
+  const rect = (x, y, w, h, c) => pg.ops += `${col(c)} rg ${f2(x)} ${f2(H - y - h)} ${f2(w)} ${f2(h)} re f\n`;
+  const line = (x1, y1, x2, y2, w, c) => pg.ops += `${col(c)} RG ${f2(w)} w ${f2(x1)} ${f2(H - y1)} m ${f2(x2)} ${f2(H - y2)} l S\n`;
+  const addImg = (dataUrl, pw, ph) => { images.push({ bytes: atob(dataUrl.split(",")[1]), w: pw, h: ph }); return images.length - 1; };
+  const drawImg = (i, x, y, w, h) => pg.ops += `q ${f2(w)} 0 0 ${f2(h)} ${f2(x)} ${f2(H - y - h)} cm /Im${i} Do Q\n`;
+
+  /* --- gemeinsame Daten --- */
+  const praxis = $("sName").value.trim() || "Zahnarztpraxis";
+  const addr = $("sAddr").value.split("\n").map(l => l.trim()).filter(Boolean);
+  const t = docTitle(), cut = t.indexOf(" – ");
+  let eyebrow = cut > 0 ? t.slice(0, cut) : "Fotodokumentation", head = cut > 0 ? t.slice(cut + 3) : t;
+  if (eyebrow.toLowerCase() === head.toLowerCase()) eyebrow = "";
+  const pat = [["Patient", $("fName").value.trim() || "–"], ["Geburtsdatum", $("fBirth").value.trim() || "–"], ["Aufnahme vom", deDate($("fDate").value) || "–"]];
+  let logo = null;
+  const logoEl = $("logo");
+  if (logoEl.getAttribute("src") && logoEl.naturalWidth) {
+    const c = document.createElement("canvas");
+    c.width = logoEl.naturalWidth; c.height = logoEl.naturalHeight;
+    const ctx = c.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(logoEl, 0, 0);
+    logo = { id: addImg(c.toDataURL("image/jpeg", 0.95), c.width, c.height), w: c.width, h: c.height };
+  }
+  const logoSize = (maxW, maxH) => { const s = Math.min(maxW / logo.w, maxH / logo.h); return [logo.w * s, logo.h * s]; };
+  const patientBox = (y, fill) => {          // Patientendaten in drei Spalten
+    const boxW = W - 2 * M, boxH = 40, pad = fill ? 14 : 0, shares = [0.5, 0.25, 0.25];
+    if (fill) fillRR(M, y, boxW, boxH, 6, fill);
+    let fx = M + pad;
+    pat.forEach(([k, v], i) => {
+      const cw = (boxW - 2 * pad) * shares[i];
+      text(k.toUpperCase(), fx, y + 15, 6.8, { bold: true, color: C_MUTED, tc: 0.9 });
+      text(fit(v, 11, i === 0, cw - 10), fx, y + 31, 11, { bold: i === 0 });
+      if (i > 0) line(fx - 12, y + 9, fx - 12, y + boxH - 9, 0.6, C_LINE);
+      fx += cw;
+    });
+    return y + boxH;
+  };
+
+  newPage();
+  let y;
+  if (design === "akzent") {
+    /* ===== AKZENT: farbiges Band oben ===== */
+    const bandH = 30 * mm;
+    rect(0, 0, W, bandH, ACC);
+    if (logo) {
+      const [lw, lh] = logoSize(40 * mm, 13 * mm);
+      fillRR(M, (bandH - lh) / 2 - 6, lw + 12, lh + 12, 5, WHITE);
+      drawImg(logo.id, M + 6, (bandH - lh) / 2, lw, lh);
+    }
+    const blockH = 12 + addr.length * 10.5, top = (bandH - blockH) / 2;
+    text(praxis, W - M, top + 9, 10, { bold: true, color: WHITE, align: "right" });
+    addr.forEach((l, i) => text(l, W - M, top + 21 + i * 10.5, 8, { color: mix(ACC, 0.72), align: "right" }));
+    const cw = (W - 2 * M) * 0.42;
+    text(eyebrow.toUpperCase(), W / 2, bandH / 2 - 6, 7.5, { bold: true, color: mix(ACC, 0.65), align: "center", tc: 1.8 });
+    text(fit(head, 18, true, cw), W / 2, bandH / 2 + 15, 18, { bold: true, color: WHITE, align: "center" });
+    y = patientBox(bandH + 14, null) + 6;
+    line(M, y, W - M, y, 0.6, C_LINE);
+  } else if (design === "elegant") {
+    /* ===== ELEGANT: alles zentriert, Serifenschrift ===== */
+    y = M - 4;
+    if (logo) { const [lw, lh] = logoSize(42 * mm, 14 * mm); drawImg(logo.id, (W - lw) / 2, y, lw, lh); y += lh + 6; }
+    text(fit(praxis, 13, true, W - 2 * M, true), W / 2, y + 12, 13, { bold: true, serif: true, color: ACC, align: "center" });
+    y += 12;
+    if (addr.length) { y += 13; text(fit(addr.join("   ·   "), 8.5, false, W - 2 * M), W / 2, y, 8.5, { color: C_MUTED, align: "center" }); }
+    y += 14;
+    line(W / 2 - 25 * mm, y, W / 2 + 25 * mm, y, 0.7, ACC);
+    y += 20;
+    text(eyebrow.toUpperCase(), W / 2, y, 7.5, { bold: true, color: C_MUTED, align: "center", tc: 2.2 });
+    y += 24;
+    text(fit(head, 24, true, W - 2 * M, true), W / 2, y, 24, { bold: true, serif: true, align: "center" });
+    y += 22;
+    // Patientenzeile: Beschriftung grau, Wert dunkel, mittig
+    const seg = []; pat.forEach(([k, v], i) => { if (i) seg.push(["      ·      ", C_MUTED, false]); seg.push([k + "  ", C_MUTED, false], [v, C_TEXT, i === 0]); });
+    const total = seg.reduce((a, [s, , b]) => a + textW(s, 10, b), 0);
+    let sx = (W - total) / 2;
+    for (const [s, c, b] of seg) sx += text(s, sx, y, 10, { color: c, bold: b });
+    y += 4;
+  } else {
+    /* ===== KLAR: Logo links · Titel mittig · Praxis rechts ===== */
+    y = M;
+    let lh = 0;
+    if (logo) { const [lw, h] = logoSize(45 * mm, 16 * mm); drawImg(logo.id, M, y, lw, h); lh = h; }
+    text(praxis, W - M, y + 10, 10, { bold: true, color: ACC, align: "right" });
+    addr.forEach((l, i) => text(l, W - M, y + 22 + i * 10.5, 8, { color: C_MUTED, align: "right" }));
+    const cw = (W - 2 * M) * 0.42;
+    text(eyebrow.toUpperCase(), W / 2, y + 11, 7.5, { bold: true, color: ACC, align: "center", tc: 1.8 });
+    text(fit(head, 18, true, cw), W / 2, y + 33, 18, { bold: true, align: "center" });
+    y += Math.max(lh, 12 + addr.length * 10.5, 38) + 12;
+    line(M, y, W - M, y, 0.6, C_LINE);
+    y = patientBox(y + 14, TINT);
+  }
+
+  /* --- Bemerkungen --- */
+  const notes = $("fNotes").value.trim();
+  if (notes) {
+    const center = design === "elegant";
+    y += 18;
+    text("BEMERKUNGEN", center ? W / 2 : M, y, 6.8, { bold: true, color: C_MUTED, tc: 0.9, align: center ? "center" : "left" });
+    for (const l of wrap(notes, 9.5, false, W - 2 * M)) { y += 13; text(l, center ? W / 2 : M, y, 9.5, { align: center ? "center" : "left" }); }
+  }
+  y += 18;
+
+  /* --- Bilder, nach Gruppen --- */
+  const cols = +$("cols").value, gap = 4.5 * mm, groupGap = 10 * mm, capH = 18, limit = H - M - 4;
+  const radius = { klar: 6, akzent: 4, elegant: 1.5 }[design] ?? 6;
+  const contentW = W - 2 * M;
+  // Gruppen bilden (nur Bilder mit Foto)
+  const groups = [];
+  for (const sl of slots.filter(s => s.out)) {
+    let g = groups[groups.length - 1];
+    if (!g || g.title !== sl.section) groups.push(g = { title: sl.section, items: [] });
+    g.items.push(sl);
+  }
+  const hasTitles = groups.some(g => g.title);
+  // Hochformat-Gruppe, wenn die Mehrheit der Fotos hochkant ist
+  groups.forEach(g => {
+    g.ratio = g.items.filter(s => s.h > s.w).length > g.items.length / 2 ? 2 / 3 : 3 / 2;
+    g.perRow = g.ratio < 1 ? Math.max(cols, 4) : cols;
+  });
+  // Reihen packen: kleine Gruppen gleicher Ausrichtung teilen sich eine Reihe
+  const rowsOut = [];
+  for (const g of groups) {
+    for (let i = 0; i < g.items.length; i += g.perRow) {
+      const part = { title: i === 0 ? g.title : "", items: g.items.slice(i, i + g.perRow), ratio: g.ratio, perRow: g.perRow };
+      const last = rowsOut[rowsOut.length - 1];
+      const used = last ? last.parts.reduce((a, p) => a + p.items.length, 0) : 0;
+      if (last && i === 0 && last.ratio === g.ratio && used + part.items.length <= g.perRow) last.parts.push(part);
+      else rowsOut.push({ ratio: g.ratio, perRow: g.perRow, parts: [part] });
+    }
+  }
+  const headH = hasTitles ? 22 : 0;
+  const drawHeading = (title, x, w, yy) => {
+    if (!title) return;
+    if (design === "akzent") {
+      rect(x, yy - 9, 3, 11, ACC);
+      text(fit(title, 10, true, w - 8), x + 8, yy, 10, { bold: true });
+    } else if (design === "elegant") {
+      const tw = textW(title, 12, false, true);
+      text(fit(title, 12, false, w, true), x + w / 2, yy, 12, { serif: true, align: "center" });
+      if (w - tw > 60) { line(x + 10, yy - 4, x + (w - tw) / 2 - 10, yy - 4, 0.5, C_LINE); line(x + (w + tw) / 2 + 10, yy - 4, x + w - 10, yy - 4, 0.5, C_LINE); }
+    } else {
+      const tw = text(fit(title.toUpperCase(), 8, true, w, false), x, yy, 8, { bold: true, color: ACC, tc: 1.2 });
+      if (x + tw + 8 < x + w) line(x + tw + 8, yy - 3, x + w, yy - 3, 0.6, C_LINE);
+    }
+  };
+  const drawCaption = (label, x, cw, yy) => {
+    if (design === "akzent") {
+      rect(x, yy - 8, 2.5, 10, ACC);
+      text(fit(label, 8.5, true, cw - 8), x + 7, yy, 8.5, { bold: true });
+    } else if (design === "elegant") {
+      text(fit(label.toUpperCase(), 7, true, cw), x + cw / 2, yy, 7, { bold: true, color: C_MUTED, align: "center", tc: 1.1 });
+    } else {
+      text(fit(label, 8.5, true, cw), x + cw / 2, yy, 8.5, { bold: true, align: "center" });
+    }
+  };
+  let rowY = y - 4;
+  rowsOut.forEach((row, ri) => {
+    const n = row.parts.reduce((a, p) => a + p.items.length, 0);
+    const gaps = (n - row.parts.length) * gap + (row.parts.length - 1) * groupGap;
+    // Feldbreite wie bei voller Reihe -> einheitliche Größen
+    let cw = (contentW - (row.perRow - 1) * gap) / row.perRow;
+    if (n * cw + gaps > contentW) cw = (contentW - gaps) / n;
+    let ph = cw / row.ratio;
+    const thisHead = row.parts.some(p => p.title) ? headH : 0;
+    const need = () => thisHead + ph + capH;
+    if (ri > 0) rowY += gap + 2;
+    let avail = limit - rowY;
+    if (need() > avail) {
+      const sc = (avail - thisHead - capH) / ph;               // etwas kleiner, wenn es dann noch passt
+      if (sc >= 0.8) { cw *= sc; ph *= sc; }
+      else { newPage(); rowY = M; avail = limit - rowY; if (need() > avail) { const s2 = (avail - thisHead - capH) / ph; cw *= s2; ph *= s2; } }
+    }
+    const totalW = n * cw + (n - row.parts.length) * gap + (row.parts.length - 1) * groupGap;
+    let x = (W - totalW) / 2;
+    const imgY = rowY + thisHead;
+    for (const part of row.parts) {
+      const pw = part.items.length * cw + (part.items.length - 1) * gap;
+      drawHeading(part.title, x, pw, rowY + 12);
+      part.items.forEach((s, k) => {
+        const cx = x + k * (cw + gap);
+        const id = addImg(s.out, s.w, s.h);
+        pg.ops += `q ${rr(cx, imgY, cw, ph, radius)}W n\n`;
+        const cover = Math.abs((s.w / s.h) / (cw / ph) - 1) < 0.06;
+        if (!cover) pg.ops += `${col(C_IMGBG)} rg ${f2(cx)} ${f2(H - imgY - ph)} ${f2(cw)} ${f2(ph)} re f\n`;
+        const sc = cover ? Math.max(cw / s.w, ph / s.h) : Math.min(cw / s.w, ph / s.h);
+        const iw = s.w * sc, ih = s.h * sc;
+        drawImg(id, cx + (cw - iw) / 2, imgY + (ph - ih) / 2, iw, ih);
+        pg.ops += "Q\n";
+        drawCaption(s.label.trim(), cx, cw, imgY + ph + 13);
+      });
+      x += pw + groupGap;
+    }
+    rowY = imgY + ph + capH;
+  });
+
+  /* --- Fußzeile: nur der Hinweistext, mittig (Seitenzahl nur bei mehreren Seiten) --- */
+  const foot = $("sFoot").value.trim().replace(/\s*\n\s*/g, " · ");
+  pages.forEach((p, i) => {
+    pg = p;
+    const fy = H - M + 14;
+    if (design === "akzent") rect(0, H - 5, W, 5, ACC);
+    text(fit(foot, 7, false, (W - 2 * M) * 0.7), W / 2, fy, 7, { color: C_MUTED, align: "center" });
+    if (pages.length > 1) text(`Seite ${i + 1} von ${pages.length}`, W - M, fy, 7, { color: C_MUTED, align: "right" });
+  });
+  return buildPdf(W, H, pages, images);
+}
+
+function makePdf() {
+  if (!slots.some(s => s.out)) { alert("Es wurden noch keine Bilder eingefügt."); return; }
+  let blob;
+  try { blob = renderPdf(); } catch (e) { alert("PDF konnte nicht erstellt werden: " + e.message); return; }
+  const who = $("fName").value.trim() || "Patient";
+  const fname = `${docTitle()} ${who} ${deDate($("fDate").value)}`.trim().replace(/[\\/:*?"<>|]/g, "-") + ".pdf";
+  const file = new File([blob], fname, { type: "application/pdf" });
+  const touch = matchMedia("(pointer: coarse)").matches;
+  // iPad/iPhone: Teilen-Menü (Mail, „In Dateien sichern“, AirDrop …)
+  if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: fname }).catch(err => { if (err.name !== "AbortError") download(blob, fname); });
+  } else download(blob, fname);
+}
+function download(blob, fname) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+}
+
+/* ---------- Start ---------- */
+loadSettings();
+setLayout();
+newPatient(false);
+// Offline-Fähigkeit, wenn die App über eine Webadresse geöffnet wird (Home-Bildschirm)
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
