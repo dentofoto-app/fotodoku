@@ -251,6 +251,11 @@ const DEFAULT_FOOTS = [
 ];
 const DEFAULT_TITLES = ["Fotodokumentation – Ist-Zustand", "Fotodokumentation – Verlaufskontrolle", "Fotodokumentation – Behandlungsabschluss"];
 const DEFAULT_LABELS = [
+  "# Gesicht", "Profil (seitlich)", "Gesicht frontal", "Gesicht lächeln", "Hinterkopf / oberer Rücken",
+  "# Zähne – Kiefer geschlossen", "Links", "Frontal", "Rechts",
+  "# Zähne – Mund geöffnet", "Oberkiefer", "Unterkiefer",
+  "# Nase", "Nasenöffnung"];
+const PREV_LABELS = [
   "# Gesicht", "Gesicht links", "Gesicht frontal", "Gesicht rechts", "Hinterkopf / Schulter / oberer Rücken",
   "# Zähne – Kiefer geschlossen", "Links", "Frontal", "Rechts",
   "# Zähne – Mund geöffnet", "Oberkiefer", "Unterkiefer",
@@ -277,7 +282,7 @@ function loadSettings() {
   $("sFoot").value = foots.join("\n");
   $("sDesign").value = s.design || "aquarell";
   $("sColor").value = s.color || "#1f6f8b";
-  const lab = !s.labels || s.labels.join("|") === OLD_LABELS.join("|") ? DEFAULT_LABELS : s.labels;   // alte Vorgabe ersetzen
+  const lab = !s.labels || [OLD_LABELS, PREV_LABELS].some(o => s.labels.join("|") === o.join("|")) ? DEFAULT_LABELS : s.labels;   // alte Vorgaben ersetzen
   $("sLabels").value = lab.join("\n");
   $("cols").value = s.cols || "3";
   $("orient").value = s.orient || "landscape";
