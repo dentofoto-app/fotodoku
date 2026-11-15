@@ -702,7 +702,7 @@ function buildPdf(W, H, pages, images) {
   const xo = images.map((_, i) => `/Im${i} ${firstImg + i} 0 R`).join(" ");
   pages.forEach((p, i) => {
     const id = pageIds[i];
-    obj(id, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f2(W)} ${f2(H)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> /XObject << ${xo} >> >> /Contents ${id + 1} 0 R >>`);
+    obj(id, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${f2(W)} ${f2(H)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> /XObject << ${xo} >> /ExtGState << /Sh << /ca 0.045 /CA 0.045 >> >> >> /Contents ${id + 1} 0 R >>`);
     obj(id + 1, `<< /Length ${p.ops.length} >>\nstream\n`, p.ops, "\nendstream");
   });
   const n = firstPage + pages.length * 2, xref = len;
@@ -717,7 +717,7 @@ function buildPdf(W, H, pages, images) {
 /* Aquarell-Design: Farben aus dem Hintergrundbild */
 const AQ = {
   petrol: [0.2, 0.44, 0.47], gold: [0.73, 0.58, 0.33], text: [0.17, 0.27, 0.3], muted: [0.42, 0.52, 0.53],
-  line: [0.86, 0.8, 0.68], cream: [0.996, 0.984, 0.957]
+  line: [0.86, 0.8, 0.68], cream: [0.996, 0.984, 0.957], shadow: [0.16, 0.3, 0.32]
 };
 const AQ_IMG = new Image();
 AQ_IMG.src = AQ_BG_DATA;
@@ -938,13 +938,21 @@ function renderPdf() {
       part.items.forEach((s, k) => {
         const cx = x + k * (cw + gap);
         const id = addImg(s.out, s.w, s.h);
-        if (aq) fillRR(cx - 3.5, imgY - 3.5, cw + 7, ph + 7, radius + 2, WHITE);   // weißes Passepartout
-        pg.ops += `q ${rr(cx, imgY, cw, ph, radius)}W n\n`;
-        const cover = Math.abs((s.w / s.h) / (cw / ph) - 1) < 0.06;
-        if (!cover) pg.ops += `${col(aq ? AQ.cream : C_IMGBG)} rg ${f2(cx)} ${f2(H - imgY - ph)} ${f2(cw)} ${f2(ph)} re f\n`;
-        const sc = cover ? Math.max(cw / s.w, ph / s.h) : Math.min(cw / s.w, ph / s.h);
+        let bx = cx, by = imgY, bw = cw, bh = ph, br = radius;
+        if (aq) {                                          // Bilderrahmen: weicher Schatten, weißes Passepartout, feine Goldlinie
+          for (let k = 5; k >= 1; k--) pg.ops += `q /Sh gs ${col(AQ.shadow)} rg ${rr(cx - k * 0.7, imgY + 1.2 - k * 0.5, cw + k * 1.4, ph + k * 1.4, radius + 3 + k)}f Q\n`;
+          fillRR(cx, imgY, cw, ph, radius + 3, WHITE);
+          const pad = Math.max(4, Math.min(8, cw * 0.035));
+          bx += pad; by += pad; bw -= 2 * pad; bh -= 2 * pad; br = 1.5;
+          const o = Math.min(2.4, pad * 0.45);
+          pg.ops += `${col(AQ.gold)} RG 0.5 w ${rr(bx - o, by - o, bw + 2 * o, bh + 2 * o, br + o)}S\n`;
+        }
+        pg.ops += `q ${rr(bx, by, bw, bh, br)}W n\n`;
+        const cover = Math.abs((s.w / s.h) / (bw / bh) - 1) < 0.06;
+        if (!cover) pg.ops += `${col(aq ? AQ.cream : C_IMGBG)} rg ${f2(bx)} ${f2(H - by - bh)} ${f2(bw)} ${f2(bh)} re f\n`;
+        const sc = cover ? Math.max(bw / s.w, bh / s.h) : Math.min(bw / s.w, bh / s.h);
         const iw = s.w * sc, ih = s.h * sc;
-        drawImg(id, cx + (cw - iw) / 2, imgY + (ph - ih) / 2, iw, ih);
+        drawImg(id, bx + (bw - iw) / 2, by + (bh - ih) / 2, iw, ih);
         pg.ops += "Q\n";
         drawCaption(s.label.trim(), cx, cw, imgY + ph + 13);
       });
